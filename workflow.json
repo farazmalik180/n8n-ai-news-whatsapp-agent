@@ -1,0 +1,89 @@
+{
+  "name": "Daily AI Agent News to WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 12,
+              "triggerAtMinute": 45
+            }
+          ]
+        }
+      },
+      "name": "Daily at 12:45 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.feedburner.com/oreilly/radar/atom"
+      },
+      "name": "Fetch AI News RSS",
+      "type": "n8n-nodes-base.rssFeedRead"
+    },
+    {
+      "parameters": {
+        "jsCode": "// keyword filtering logic unchanged"
+      },
+      "name": "Filter & Select Best Article",
+      "type": "n8n-nodes-base.code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: \"llama-3.1-8b-instant\", messages: [{ role: \"user\", content: `Summarize this for WhatsApp in under 300 characters:\\n\\nTitle: ${$json.title}\\nSummary: ${$json.contentSnippet}\\nLink: ${$json.link}` }] } }}"
+      },
+      "name": "Summarize with Llama",
+      "type": "n8n-nodes-base.httpRequest"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "message",
+              "value": "={{ \"🤖 AI News Daily\\n\\n\" + $json.choices[0].message.content }}"
+            }
+          ]
+        }
+      },
+      "name": "Format WhatsApp Message",
+      "type": "n8n-nodes-base.set"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/YOUR_TWILIO_ACCOUNT_SID/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "To",
+              "value": "whatsapp:+YOUR_PHONE_NUMBER"
+            },
+            {
+              "name": "From",
+              "value": "whatsapp:+14155238886"
+            },
+            {
+              "name": "Body",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        }
+      },
+      "name": "Send WhatsApp via Twilio",
+      "type": "n8n-nodes-base.httpRequest"
+    }
+  ]
+}
